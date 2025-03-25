@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>轻量版远程提词器</title>
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #5D5CDE;
+            --text-color: #333;
+            --bg-color: #fff;
+            --secondary-bg: #f5f5f5;
+            --border-color: #ddd;
+        }
+        
+        .dark {
+            --text-color: #eee;
+            --bg-color: #222;
+            --secondary-bg: #333;
+            --border-color: #444;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        h1 {
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+        }
+        
+        .role-selection {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 2rem 0;
+        }
+        
+        .role-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            width: 100%;
+            max-width: 500px;
+            margin-top: 1rem;
+        }
+        
+        @media (min-width: 640px) {
+            .role-buttons {
+                flex-direction: row;
+            }
+        }
+        
+        .role-btn {
+            flex: 1;
+            padding: 1rem;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            text-align: center;
+            transition: opacity 0.2s;
+        }
+        
+        .role-btn:hover {
+            opacity: 0.9;
+        }
+        
+        .ui-container {
+            display: none;
+        }
+        
+        .connection-status {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            background-color: #FEF3C7;
+            color: #92400E;
+            margin-bottom: 1rem;
+        }
+        
+        .status-dot {
+            height: 10px;
+            width: 10px;
+            border-radius: 50%;
+            background-color: currentColor;
+            margin-right: 0.5rem;
+            animation: blink 2s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .connected {
+            background-color: #D1FAE5;
+            color: #065F46;
+        }
+        
+        .connection-box {
+            background-color: var(--secondary-bg);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .id-container {
+            display: flex;
+            margin-bottom: 1rem;
+        }
+        
+        .id-input {
+            flex: 1;
+            padding: 0.5rem;
+            font-size: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+        }
+        
+        .button {
+            padding: 0.5rem 1rem;
+            margin-left: 0.5rem;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: opacity 0.2s;
+        }
+        
+        .button:hover {
+            opacity: 0.9;
+        }
+        
+        .secondary-button {
+            background-color: var(--secondary-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+        }
+        
+        .qr-container {
+            display: flex;
+            justify-content: center;
+            margin: 1rem 0;
+        }
+        
+        .content-area {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+        }
+        
+        @media (min-width: 768px) {
+            .content-area {
+                grid-template-columns: 2fr 1fr;
+            }
+        }
+        
+        .text-area {
+            width: 100%;
+            min-height: 200px;
+            padding: 0.5rem;
+            font-size: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            resize: vertical;
+        }
+        
+        .control-panel {
+            background-color: var(--secondary-bg);
+            border-radius: 8px;
+            padding: 1rem;
+        }
+        
+        .control-group {
+            margin-bottom: 1rem;
+        }
+        
+        .control-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+        
+        .slider-container {
+            display: flex;
+            align-items: center;
+        }
+        
+        .slider {
+            flex: 1;
+            margin-right: 0.5rem;
+        }
+        
+        .switch-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+            margin-right: 0.5rem;
+        }
+        
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider-switch {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: 0.4s;
+            border-radius: 34px;
+        }
+        
+        .slider-switch:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: 0.4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider-switch {
+            background-color: var(--primary-color);
+        }
+        
+        input:checked + .slider-switch:before {
+            transform: translateX(26px);
+        }
+        
+        .teleprompter-display {
+            width: 100%;
+            height: 70vh;
+            min-height: 300px;
+            background-color: black;
+            color: white;
+            overflow: hidden;
+            position: relative;
+            margin-top: 1rem;
+        }
+        
+        .teleprompter-container {
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+            scrollbar-width: none;
+        }
+        
+        .teleprompter-container::-webkit-scrollbar {
+            display: none;
+        }
+        
+        .prompter-text {
+            text-align: center;
+            padding: 2rem;
+            padding-top: 40vh;
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-size: 32px;
+        }
+        
+        .mirror {
+            transform: scaleY(-1);
+        }
+        
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+        
+        .ai-response {
+            margin-top: 1rem;
+            padding: 1rem;
+            background-color: var(--secondary-bg);
+            border-radius: 8px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .ai-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        
+        .ai-content {
+            font-size: 0.9rem;
+            white-space: pre-wrap;
+        }
+        
+        /* Utilities */
+        .hidden {
+            display: none !important;
+        }
+        
+        .flex {
+            display: flex;
+        }
+        
+        .justify-between {
+            justify-content: space-between;
+        }
+        
+        .items-center {
+            align-items: center;
+        }
+        
+        .green-button {
+            background-color: #10B981;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- App Header -->
+        <header>
+            <h1>轻量版远程提词器</h1>
+            <p>在MacBook上控制，在iPad上显示</p>
+        </header>
+
+        <!-- Role Selection -->
+        <div id="roleSelection" class="role-selection">
+            <h2>选择设备角色</h2>
+            <div class="role-buttons">
+                <button id="controllerBtn" class="role-btn">
+                    控制端 (MacBook)
+                </button>
+                <button id="displayBtn" class="role-btn">
+                    显示端 (iPad)
+                </button>
+            </div>
+        </div>
+
+        <!-- Controller UI -->
+        <div id="controllerUI" class="ui-container">
+            <div class="flex justify-between items-center">
+                <h2>控制界面</h2>
+                <div id="connectionStatus" class="connection-status">
+                    <span class="status-dot"></span>
+                    <span>等待连接...</span>
+                </div>
+            </div>
+
+            <!-- Connection Setup -->
+            <div class="connection-box">
+                <h3>连接设置</h3>
+                <div style="margin-top: 1rem;">
+                    <p>你的连接ID：</p>
+                    <div class="id-container">
+                        <input id="myId" type="text" class="id-input" readonly>
+                        <button id="copyIdBtn" class="button secondary-button">复制</button>
+                    </div>
+                    <div id="qrCodeContainer" class="qr-container"></div>
+                </div>
+                <div style="margin-top: 1rem;">
+                    <p>连接到显示端：</p>
+                    <div class="id-container">
+                        <input id="peerId" type="text" class="id-input" placeholder="输入显示端ID">
+                        <button id="connectBtn" class="button">连接</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Content Control -->
+            <div class="content-area">
+                <div>
+                    <div style="margin-bottom: 1rem;">
+                        <label for="promptText">提词内容</label>
+                        <textarea id="promptText" class="text-area" placeholder="在此输入需要显示的文本内容..."></textarea>
+                    </div>
+                    <div class="button-group">
+                        <button id="sendBtn" class="button">发送到提词器</button>
+                        <button id="clearBtn" class="button secondary-button">清空</button>
+                        <button id="askAIBtn" class="button green-button">询问Gemini</button>
+                    </div>
+                    
+                    <!-- AI Response Area -->
+                    <div id="aiResponse" class="ai-response hidden">
+                        <div class="ai-header">
+                            <h4>Gemini 回答</h4>
+                            <button id="useAIResponseBtn" class="button">使用此回答</button>
+                        </div>
+                        <div id="aiResponseText" class="ai-content"></div>
+                    </div>
+                </div>
+                <div class="control-panel">
+                    <h3 style="margin-bottom: 1rem;">显示控制</h3>
+                    
+                    <div class="control-group">
+                        <label class="control-label">文字大小: <span id="fontSizeValue">32</span>px</label>
+                        <input id="fontSize" type="range" min="16" max="72" value="32" class="slider">
+                    </div>
+                    
+                    <div class="control-group">
+                        <label class="control-label">滚动速度: <span id="scrollSpeedValue">2</span></label>
+                        <input id="scrollSpeed" type="range" min="0" max="10" value="2" class="slider">
+                    </div>
+                    
+                    <div class="control-group">
+                        <label class="control-label">显示设置</label>
+                        <div class="button-group">
+                            <button id="toggleScrollBtn" class="button secondary-button">开始滚动</button>
+                            <button id="resetScrollBtn" class="button secondary-button">回到顶部</button>
+                        </div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label class="control-label">其他设置</label>
+                        <div class="switch-container">
+                            <label class="switch">
+                                <input id="mirrorToggle" type="checkbox">
+                                <span class="slider-switch"></span>
+                            </label>
+                            <span>镜像反转（提词玻璃）</span>
+                        </div>
+                        
+                        <div class="switch-container">
+                            <label class="switch">
+                                <input id="darkModeToggle" type="checkbox">
+                                <span class="slider-switch"></span>
+                            </label>
+                            <span>深色模式</span>
+                        </div>
+                        
+                        <div class="switch-container">
+                            <label class="switch">
+                                <input id="passwordProtect" type="checkbox">
+                                <span class="slider-switch"></span>
+                            </label>
+                            <span>密码保护</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Display UI -->
+        <div id="displayUI" class="ui-container">
+            <div class="flex justify-between items-center">
+                <h2>显示界面</h2>
+                <div id="displayConnectionStatus" class="connection-status">
+                    <span class="status-dot"></span>
+                    <span>等待连接...</span>
+                </div>
+            </div>
+
+            <!-- Display Connection Setup -->
+            <div class="connection-box">
+                <h3>连接设置</h3>
+                <p>你的显示端ID (分享给控制端)：</p>
+                <div class="id-container">
+                    <input id="displayId" type="text" class="id-input" readonly>
+                    <button id="copyDisplayIdBtn" class="button secondary-button">复制</button>
+                </div>
+                <div id="displayQrCodeContainer" class="qr-container"></div>
+            </div>
+
+            <!-- Teleprompter Display -->
+            <div id="teleprompterDisplay" class="teleprompter-display">
+                <div id="teleprompterContainer" class="teleprompter-container">
+                    <div id="promptContent" class="prompter-text">
+                        等待接收文本...
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Password Protection Modal -->
+        <div id="passwordModal" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 1000;">
+            <div style="background: var(--bg-color); padding: 2rem; border-radius: 8px; width: 90%; max-width: 400px;">
+                <h3 style="margin-bottom: 1rem;">输入密码</h3>
+                <input id="passwordInput" type="password" class="id-input" style="margin-bottom: 1rem;" placeholder="请输入访问密码">
+                <div class="button-group">
+                    <button id="submitPassword" class="button">确认</button>
+                    <button id="cancelPassword" class="button secondary-button">取消</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 加载时确保密码模态框是隐藏的
+        document.addEventListener('DOMContentLoaded', function() {
+            const passwordModal = document.getElementById('passwordModal');
+            if (passwordModal) {
+                passwordModal.classList.add('hidden');
+                console.log("页面加载时已确保密码框隐藏");
+            }
+        });
+
+        // Check for dark mode preference
+        const prefersDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (prefersDarkMode) {
+            document.body.classList.add('dark');
+            const darkModeToggle = document.getElementById('darkModeToggle');
+            if (darkModeToggle) darkModeToggle.checked = true;
+        }
+
+        // Listen for changes in color scheme preference
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+            if (event.matches) {
+                document.body.classList.add('dark');
+                const darkModeToggle = document.getElementById('darkModeToggle');
+                if (darkModeToggle) darkModeToggle.checked = true;
+            } else {
+                document.body.classList.remove('dark');
+                const darkModeToggle = document.getElementById('darkModeToggle');
+                if (darkModeToggle) darkModeToggle.checked = false;
+            }
+        });
+        
+        // Variables
+        let peer = null;
+        let connection = null;
+        let role = null;
+        let scrollInterval = null;
+        let scrolling = false;
+        let scrollSpeed = 2;
+        let hasPassword = false;  // 确保初始状态为false
+        let accessPassword = "";  // 确保初始为空
+
+        // Elements
+        const roleSelection = document.getElementById('roleSelection');
+        const controllerUI = document.getElementById('controllerUI');
+        const displayUI = document.getElementById('displayUI');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const displayConnectionStatus = document.getElementById('displayConnectionStatus');
+        const passwordModal = document.getElementById('passwordModal');
+        const passwordInput = document.getElementById('passwordInput');
+        
+        // 确保密码模态框隐藏
+        if (passwordModal) {
+            passwordModal.classList.add('hidden');
+        }
+        
+        // Initialize PeerJS with public STUN servers for NAT traversal
+        function initializePeer(isController) {
+            // Generate a random ID with a prefix
+            const randomId = (isController ? 'c-' : 'd-') + Math.random().toString(36).substring(2, 10);
+            
+            // Configure PeerJS with ICE servers for NAT traversal
+            const peerConfig = {
+                debug: 1, // Reduce debug level to save tokens
+                config: {
+                    'iceServers': [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' },
+                        { urls: 'stun:openrelay.metered.ca:80' }
+                    ]
+                }
+            };
+            
+            peer = new Peer(randomId, peerConfig);
+            
+            peer.on('open', (id) => {
+                console.log("Peer connection opened with ID:", id);
+                if (isController) {
+                    document.getElementById('myId').value = id;
+                    generateQRCode(id, 'qrCodeContainer');
+                } else {
+                    document.getElementById('displayId').value = id;
+                    generateQRCode(id, 'displayQrCodeContainer');
+                }
+            });
+            
+            peer.on('connection', (conn) => {
+                console.log("Incoming connection from peer");
+                connection = conn;
+                setupConnection();
+            });
+            
+            peer.on('error', (err) => {
+                console.error('PeerJS error:', err);
+                
+                let errorMessage = '连接错误: ' + err.message;
+                
+                // Add helpful messages for common errors
+                if (err.type === 'peer-unavailable') {
+                    errorMessage = '无法连接到指定ID的设备。请确认ID是否正确，以及对方设备是否在线。';
+                } else if (err.type === 'network') {
+                    errorMessage = '网络连接问题。请检查您的互联网连接并重试。';
+                } else if (err.type === 'disconnected') {
+                    errorMessage = '连接已断开。可能是网络不稳定，请刷新页面重试。';
+                }
+                
+                alert(errorMessage);
+            });
+        }
+
+        // Setup connection handlers
+        function setupConnection() {
+            connection.on('open', () => {
+                if (role === 'controller') {
+                    connectionStatus.innerHTML = '<span class="status-dot" style="background-color: #10B981;"></span><span>已连接</span>';
+                    connectionStatus.classList.add('connected');
+                    
+                    // If password protection is enabled, send password
+                    if (hasPassword) {
+                        connection.send({ type: 'setPassword', password: accessPassword });
+                    }
+                } else {
+                    displayConnectionStatus.innerHTML = '<span class="status-dot" style="background-color: #10B981;"></span><span>已连接</span>';
+                    displayConnectionStatus.classList.add('connected');
+                }
+            });
+            
+            connection.on('data', (data) => {
+                handleIncomingData(data);
+            });
+            
+            connection.on('close', () => {
+                if (role === 'controller') {
+                    connectionStatus.innerHTML = '<span class="status-dot"></span><span>连接已断开</span>';
+                    connectionStatus.classList.remove('connected');
+                } else {
+                    displayConnectionStatus.innerHTML = '<span class="status-dot"></span><span>连接已断开</span>';
+                    displayConnectionStatus.classList.remove('connected');
+                }
+                connection = null;
+            });
+        }
+
+        // Handle incoming data from peer
+        function handleIncomingData(data) {
+            if (!data || typeof data !== 'object') return;
+            
+            if (role === 'display') {
+                // Check password protection first
+                if (data.type === 'setPassword') {
+                    hasPassword = true;
+                    accessPassword = data.password;
+                    return;
+                }
+                
+                if (data.type === 'removePassword') {
+                    hasPassword = false;
+                    accessPassword = "";
+                    return;
+                }
+                
+                // Handle commands from controller
+                if (data.type === 'content') {
+                    document.getElementById('promptContent').textContent = data.content;
+                    resetScroll();
+                } else if (data.type === 'fontSize') {
+                    document.getElementById('promptContent').style.fontSize = data.value + 'px';
+                } else if (data.type === 'scrollSpeed') {
+                    scrollSpeed = data.value;
+                    if (scrolling) {
+                        stopScrolling();
+                        startScrolling();
+                    }
+                } else if (data.type === 'toggleScroll') {
+                    if (data.value) {
+                        startScrolling();
+                    } else {
+                        stopScrolling();
+                    }
+                } else if (data.type === 'resetScroll') {
+                    resetScroll();
+                } else if (data.type === 'darkMode') {
+                    if (data.value) {
+                        document.body.classList.add('dark');
+                    } else {
+                        document.body.classList.remove('dark');
+                    }
+                } else if (data.type === 'mirror') {
+                    if (data.value) {
+                        document.getElementById('promptContent').classList.add('mirror');
+                    } else {
+                        document.getElementById('promptContent').classList.remove('mirror');
+                    }
+                } else if (data.type === 'passwordRequired') {
+                    showPasswordModal();
+                } else if (data.type === 'passwordCheck') {
+                    let isValid = false;
+                    if (accessPassword === data.password) {
+                        isValid = true;
+                    }
+                    connection.send({ type: 'passwordResult', valid: isValid });
+                }
+            } else if (role === 'controller') {
+                // Handle feedback from display
+                if (data.type === 'passwordResult') {
+                    if (data.valid) {
+                        alert('密码验证成功');
+                    } else {
+                        alert('密码错误，请重试');
+                    }
+                }
+            }
+        }
+
+        // Generate QR code
+        function generateQRCode(text, containerId) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            
+            container.innerHTML = '';
+            
+            QRCode.toCanvas(
+                document.createElement('canvas'),
+                text,
+                { width: 128, margin: 1, color: { dark: '#5D5CDE', light: '#ffffff' } },
+                function(error, canvas) {
+                    if (error) {
+                        console.error('QR Code generation error:', error);
+                        return;
+                    }
+                    container.appendChild(canvas);
+                }
+            );
+        }
+
+        // Scrolling functionality
+        function startScrolling() {
+            if (scrollInterval) stopScrolling();
+            
+            scrolling = true;
+            const container = document.getElementById('teleprompterContainer');
+            
+            scrollInterval = setInterval(() => {
+                container.scrollTop += scrollSpeed;
+            }, 50);
+            
+            if (role === 'controller') {
+                document.getElementById('toggleScrollBtn').textContent = '暂停滚动';
+                if (connection) {
+                    connection.send({ type: 'toggleScroll', value: true });
+                }
+            }
+        }
+
+        function stopScrolling() {
+            scrolling = false;
+            clearInterval(scrollInterval);
+            scrollInterval = null;
+            
+            if (role === 'controller') {
+                document.getElementById('toggleScrollBtn').textContent = '开始滚动';
+                if (connection) {
+                    connection.send({ type: 'toggleScroll', value: false });
+                }
+            }
+        }
+
+        function resetScroll() {
+            const container = document.getElementById('teleprompterContainer');
+            container.scrollTop = 0;
+        }
+
+        // Password protection - 修复的版本
+        function showPasswordModal() {
+            // 只有当确实需要密码时才显示密码框
+            if (hasPassword && role === 'display') {
+                passwordModal.classList.remove('hidden');
+            }
+        }
+
+        function hidePasswordModal() {
+            passwordModal.classList.add('hidden');
+            passwordInput.value = '';
+        }
+
+        // Setup role-based UI
+        function setupController() {
+            role = 'controller';
+            roleSelection.classList.add('hidden');
+            controllerUI.classList.remove('hidden');
+            initializePeer(true);
+            
+            // Reset password state when setting up controller
+            hasPassword = false;
+            accessPassword = "";
+            
+            // Setup controller UI event listeners
+            document.getElementById('copyIdBtn').addEventListener('click', () => {
+                const myId = document.getElementById('myId');
+                myId.select();
+                document.execCommand('copy');
+                alert('ID已复制到剪贴板');
+            });
+            
+            document.getElementById('connectBtn').addEventListener('click', () => {
+                const peerId = document.getElementById('peerId').value.trim();
+                if (!peerId) {
+                    alert('请输入显示端ID');
+                    return;
+                }
+                
+                try {
+                    connection = peer.connect(peerId, { reliable: true });
+                    setupConnection();
+                } catch (err) {
+                    console.error('Connection error:', err);
+                    alert('连接失败: ' + err.message);
+                }
+            });
+            
+            document.getElementById('sendBtn').addEventListener('click', () => {
+                if (!connection) {
+                    alert('请先连接到显示端');
+                    return;
+                }
+                
+                const text = document.getElementById('promptText').value;
+                connection.send({ type: 'content', content: text });
+            });
+            
+            document.getElementById('clearBtn').addEventListener('click', () => {
+                document.getElementById('promptText').value = '';
+                if (connection) {
+                    connection.send({ type: 'content', content: '' });
+                }
+            });
+            
+            document.getElementById('fontSize').addEventListener('input', (e) => {
+                const value = e.target.value;
+                document.getElementById('fontSizeValue').textContent = value;
+                if (connection) {
+                    connection.send({ type: 'fontSize', value: value });
+                }
+            });
+            
+            document.getElementById('scrollSpeed').addEventListener('input', (e) => {
+                const value = e.target.value;
+                scrollSpeed = value;
+                document.getElementById('scrollSpeedValue').textContent = value;
+                if (connection) {
+                    connection.send({ type: 'scrollSpeed', value: value });
+                }
+            });
+            
+            document.getElementById('toggleScrollBtn').addEventListener('click', () => {
+                if (scrolling) {
+                    stopScrolling();
+                } else {
+                    startScrolling();
+                }
+            });
+            
+            document.getElementById('resetScrollBtn').addEventListener('click', () => {
+                resetScroll();
+                if (connection) {
+                    connection.send({ type: 'resetScroll' });
+                }
+            });
+            
+            document.getElementById('darkModeToggle').addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    document.body.classList.add('dark');
+                } else {
+                    document.body.classList.remove('dark');
+                }
+                
+                if (connection) {
+                    connection.send({ type: 'darkMode', value: e.target.checked });
+                }
+            });
+            
+            document.getElementById('mirrorToggle').addEventListener('change', (e) => {
+                if (connection) {
+                    connection.send({ type: 'mirror', value: e.target.checked });
+                }
+            });
+            
+            // 修复的密码保护开关处理
+            document.getElementById('passwordProtect').addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    const password = prompt('请设置一个访问密码:');
+                    if (password) {
+                        hasPassword = true;
+                        accessPassword = password;
+                        if (connection) {
+                            connection.send({ type: 'setPassword', password: password });
+                            alert('密码保护已启用，只有知道密码的人才能查看显示端内容');
+                        }
+                    } else {
+                        e.target.checked = false;
+                        hasPassword = false;
+                    }
+                } else {
+                    hasPassword = false;
+                    accessPassword = "";
+                    if (connection) {
+                        connection.send({ type: 'removePassword' });
+                        alert('密码保护已关闭');
+                    }
+                }
+            });
+            
+            // AI integration with Gemini
+            document.getElementById('askAIBtn').addEventListener('click', async () => {
+                const promptText = document.getElementById('promptText').value.trim();
+                if (!promptText) {
+                    alert('请先输入问题');
+                    return;
+                }
+                
+                const aiResponseElement = document.getElementById('aiResponse');
+                const aiResponseTextElement = document.getElementById('aiResponseText');
+                
+                aiResponseElement.classList.remove('hidden');
+                aiResponseTextElement.textContent = '正在获取Gemini回答...';
+                
+                try {
+                    if (window.Poe) {
+                        // Register handler for bot response
+                        window.Poe.registerHandler("ai-response-handler", (result) => {
+                            const msg = result.responses[0];
+                            
+                            if (msg.status === "error") {
+                                aiResponseTextElement.textContent = "错误: " + (msg.statusText || "获取AI回答失败");
+                            } else if (msg.status === "incomplete") {
+                                // Update with partial content while streaming
+                                aiResponseTextElement.textContent = msg.content;
+                            } else if (msg.status === "complete") {
+                                // Update with final content
+                                aiResponseTextElement.textContent = msg.content;
+                            }
+                        });
+
+                        // Send message to Gemini (much lower token usage)
+                        await window.Poe.sendUserMessage(
+                            "@Gemini-2.0-Flash " + promptText,
+                            {
+                                handler: "ai-response-handler",
+                                stream: true,
+                                openChat: false
+                            }
+                        );
+                    } else {
+                        // Fallback when Poe API is not available (for testing)
+                        aiResponseTextElement.textContent = "Poe API不可用，无法获取AI回答。请在Poe平台上运行此应用。";
+                    }
+                } catch (err) {
+                    aiResponseTextElement.textContent = "错误: " + err.message;
+                    console.error('AI response error:', err);
+                }
+            });
+            
+            document.getElementById('useAIResponseBtn').addEventListener('click', () => {
+                const aiResponseText = document.getElementById('aiResponseText').textContent;
+                document.getElementById('promptText').value = aiResponseText;
+                
+                if (connection) {
+                    connection.send({ type: 'content', content: aiResponseText });
+                }
+            });
+        }
+
+        function setupDisplay() {
+            role = 'display';
+            roleSelection.classList.add('hidden');
+            displayUI.classList.remove('hidden');
+            
+            // 重置密码状态
+            hasPassword = false;
+            accessPassword = "";
+            
+            // 确保密码框是隐藏的
+            if (passwordModal) {
+                passwordModal.classList.add('hidden');
+            }
+            
+            initializePeer(false);
+            
+            document.getElementById('copyDisplayIdBtn').addEventListener('click', () => {
+                const displayId = document.getElementById('displayId');
+                displayId.select();
+                document.execCommand('copy');
+                alert('ID已复制到剪贴板');
+            });
+            
+            // Password modal handlers
+            document.getElementById('submitPassword').addEventListener('click', () => {
+                const enteredPassword = passwordInput.value;
+                if (connection) {
+                    connection.send({ type: 'passwordCheck', password: enteredPassword });
+                }
+                hidePasswordModal();
+            });
+            
+            document.getElementById('cancelPassword').addEventListener('click', () => {
+                hidePasswordModal();
+            });
+        }
+
+        // Event Listeners
+        document.getElementById('controllerBtn').addEventListener('click', setupController);
+        document.getElementById('displayBtn').addEventListener('click', setupDisplay);
+
+        // Handle beforeunload to close connections properly
+        window.addEventListener('beforeunload', () => {
+            if (connection) connection.close();
+            if (peer) peer.destroy();
+        });
+        
+        // 添加页面加载测试 - 确保密码模态框初始状态是隐藏的
+        window.addEventListener('load', function() {
+            const modal = document.getElementById('passwordModal');
+            if (modal) {
+                console.log("页面加载完成，密码框状态:", modal.classList.contains('hidden') ? "隐藏" : "显示");
+                // 强制确保隐藏状态
+                modal.classList.add('hidden');
+            }
+        });
+    </script>
+</body>
+</html>
