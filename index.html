@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>提词器 - 基础版</title>
-    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <title>Firebase提词器</title>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <style>
         body {
             font-family: system-ui, -apple-system, sans-serif;
@@ -13,9 +15,7 @@
             padding: 20px;
             text-align: center;
         }
-        h1 {
-            color: #5D5CDE;
-        }
+        h1 { color: #5D5CDE; }
         .role-buttons {
             display: flex;
             flex-direction: column;
@@ -36,7 +36,7 @@
         button:hover {
             background: #4a49b8;
         }
-        .controller-ui, .display-ui {
+        .ui-container {
             display: none;
             margin-top: 30px;
             padding: 20px;
@@ -44,34 +44,20 @@
             border-radius: 8px;
             text-align: left;
         }
-        .status {
-            padding: 8px 15px;
-            border-radius: 20px;
-            display: inline-block;
-            background: #FEF3C7;
-            color: #92400E;
-            margin-bottom: 20px;
-        }
-        .status.connected {
-            background: #D1FAE5;
-            color: #065F46;
-        }
         .connection-box {
             background: #f5f5f5;
             padding: 15px;
             border-radius: 8px;
             margin-bottom: 20px;
         }
-        .id-container {
-            display: flex;
-            margin-bottom: 10px;
-        }
         input {
-            flex-grow: 1;
-            padding: 8px;
+            padding: 10px;
+            font-size: 16px;
             border: 1px solid #ddd;
             border-radius: 4px;
-            font-size: 16px;
+            margin: 5px 0;
+            width: 100%;
+            max-width: 300px;
         }
         .secondary-button {
             background: #f5f5f5;
@@ -80,7 +66,7 @@
         }
         textarea {
             width: 100%;
-            min-height: 100px;
+            min-height: 150px;
             padding: 10px;
             border: 1px solid #ddd;
             border-radius: 4px;
@@ -89,7 +75,7 @@
         }
         .teleprompter-display {
             width: 100%;
-            height: 300px;
+            height: 400px;
             background: black;
             color: white;
             overflow: auto;
@@ -102,69 +88,100 @@
             font-size: 32px;
             text-align: center;
             padding-top: 120px;
+            white-space: pre-wrap;
+        }
+        .slider-container {
+            margin: 15px 0;
+        }
+        .slider-container label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input[type="range"] {
+            width: 100%;
+            max-width: 400px;
+        }
+        .controls {
+            margin-top: 20px;
+        }
+        .status {
+            display: inline-block;
+            padding: 8px 15px;
+            border-radius: 20px;
+            margin: 10px 0;
+            background: #FEF3C7;
+            color: #92400E;
+        }
+        .status.connected {
+            background: #D1FAE5;
+            color: #065F46;
+        }
+        .mirror {
+            transform: scaleY(-1);
         }
     </style>
 </head>
 <body>
-    <h1>提词器 - 基础版</h1>
+    <h1>Firebase提词器</h1>
     <p>在MacBook上控制，在iPad上显示</p>
     
-    <!-- 角色选择 -->
-    <div id="roleSelection">
-        <div class="role-buttons">
-            <button id="controllerBtn" onclick="setupController()">控制端 (MacBook)</button>
-            <button id="displayBtn" onclick="setupDisplay()">显示端 (iPad)</button>
-        </div>
+    <div id="roleSelection" class="role-buttons">
+        <button id="controllerBtn" onclick="setupController()">控制端 (MacBook)</button>
+        <button id="displayBtn" onclick="setupDisplay()">显示端 (iPad)</button>
     </div>
     
     <!-- 控制端界面 -->
-    <div id="controllerUI" class="controller-ui">
+    <div id="controllerUI" class="ui-container">
         <div style="display: flex; justify-content: space-between; align-items: center;">
             <h2>控制界面</h2>
-            <div id="connectionStatus" class="status">
-                <span>等待连接...</span>
-            </div>
+            <div id="connectionStatus" class="status">等待连接...</div>
         </div>
         
         <div class="connection-box">
             <h3>连接设置</h3>
-            <p>你的连接ID：</p>
-            <div class="id-container">
-                <input id="myId" type="text" readonly>
-                <button id="copyIdBtn" class="button secondary-button" onclick="copyMyId()">复制</button>
-            </div>
-            
-            <p style="margin-top:15px">连接到显示端：</p>
-            <div class="id-container">
-                <input id="peerId" type="text" placeholder="输入显示端ID">
-                <button id="connectBtn" class="button" onclick="connectToPeer()">连接</button>
-            </div>
+            <p>创建或加入会话：</p>
+            <input id="sessionId" type="text" placeholder="输入会话ID" value="mySession123">
+            <button onclick="joinSession()">创建/加入会话</button>
         </div>
         
         <div>
             <label for="promptText">提词内容</label>
             <textarea id="promptText" placeholder="在此输入需要显示的文本内容..."></textarea>
-            <button id="sendBtn" class="button" onclick="sendText()">发送到提词器</button>
-            <button id="clearBtn" class="button secondary-button" onclick="clearText()">清空</button>
+            <button onclick="sendText()">发送到提词器</button>
+            <button class="secondary-button" onclick="clearText()">清空</button>
+        </div>
+        
+        <div class="slider-container">
+            <label>文字大小: <span id="fontSizeValue">32</span>px</label>
+            <input type="range" id="fontSize" min="16" max="72" value="32" oninput="updateFontSize(this.value)">
+        </div>
+        
+        <div class="slider-container">
+            <label>滚动速度: <span id="scrollSpeedValue">2</span></label>
+            <input type="range" id="scrollSpeed" min="0" max="10" value="2" oninput="updateScrollSpeed(this.value)">
+        </div>
+        
+        <div class="controls">
+            <button id="scrollBtn" onclick="toggleScroll()">开始滚动</button>
+            <button class="secondary-button" onclick="resetScroll()">回到顶部</button>
+            <label>
+                <input type="checkbox" id="mirrorToggle" onchange="toggleMirror(this.checked)"> 镜像模式
+            </label>
         </div>
     </div>
     
     <!-- 显示端界面 -->
-    <div id="displayUI" class="display-ui">
+    <div id="displayUI" class="ui-container">
         <div style="display: flex; justify-content: space-between; align-items: center;">
             <h2>显示界面</h2>
-            <div id="displayConnectionStatus" class="status">
-                <span>等待连接...</span>
-            </div>
+            <div id="displayStatus" class="status">等待连接...</div>
         </div>
         
         <div class="connection-box">
             <h3>连接设置</h3>
-            <p>你的显示端ID (分享给控制端)：</p>
-            <div class="id-container">
-                <input id="displayId" type="text" readonly>
-                <button id="copyDisplayIdBtn" class="button secondary-button" onclick="copyDisplayId()">复制</button>
-            </div>
+            <p>加入会话：</p>
+            <input id="displaySessionId" type="text" placeholder="输入会话ID" value="mySession123">
+            <button onclick="joinDisplaySession()">加入会话</button>
         </div>
         
         <div class="teleprompter-display">
@@ -172,169 +189,277 @@
                 等待接收文本...
             </div>
         </div>
+        
+        <div class="controls">
+            <button onclick="resetDisplayScroll()">回到顶部</button>
+        </div>
     </div>
     
     <script>
-        // 变量定义
-        let peer = null;
-        let connection = null;
-        let role = null;
+        // Firebase配置
+        const firebaseConfig = {
+            apiKey: "AIzaSyBGeeVfvI2rRySQV_1RXa_SbQGcL0UJu6Q",
+            authDomain: "teleprompter-app-9ade4.firebaseapp.com",
+            databaseURL: "https://teleprompter-app-9ade4-default-rtdb.firebaseio.com",
+            projectId: "teleprompter-app-9ade4",
+            storageBucket: "teleprompter-app-9ade4.appspot.com",
+            messagingSenderId: "184293742147",
+            appId: "1:184293742147:web:5f1e9fa16b3b8234eacba9"
+        };
         
-        // 角色设置
+        // 初始化Firebase
+        firebase.initializeApp(firebaseConfig);
+        
+        // 全局变量
+        let database = firebase.database();
+        let sessionRef = null;
+        let role = null;
+        let scrollInterval = null;
+        let scrolling = false;
+        let scrollSpeed = 2;
+        
+        // 设置控制端
         function setupController() {
-            console.log("设置控制端");
             role = 'controller';
             document.getElementById('roleSelection').style.display = 'none';
             document.getElementById('controllerUI').style.display = 'block';
-            initializePeer(true);
         }
         
+        // 设置显示端
         function setupDisplay() {
-            console.log("设置显示端");
             role = 'display';
             document.getElementById('roleSelection').style.display = 'none';
             document.getElementById('displayUI').style.display = 'block';
-            initializePeer(false);
         }
         
-        // PeerJS初始化
-        function initializePeer(isController) {
-            try {
-                console.log("初始化PeerJS...");
-                
-                // 生成随机ID
-                const randomId = (isController ? 'c-' : 'd-') + Math.random().toString(36).substring(2, 10);
-                
-                // 配置STUN服务器
-                const peerConfig = {
-                    debug: 0,
-                    config: {
-                        'iceServers': [
-                            { urls: 'stun:stun.l.google.com:19302' },
-                            { urls: 'stun:stun1.l.google.com:19302' }
-                        ]
-                    }
-                };
-                
-                peer = new Peer(randomId, peerConfig);
-                
-                peer.on('open', (id) => {
-                    console.log("PeerJS连接已打开，ID:", id);
-                    if (isController) {
-                        document.getElementById('myId').value = id;
-                    } else {
-                        document.getElementById('displayId').value = id;
-                    }
-                });
-                
-                peer.on('connection', (conn) => {
-                    console.log("收到连接请求");
-                    connection = conn;
-                    setupConnection();
-                });
-                
-                peer.on('error', (err) => {
-                    console.error('PeerJS错误:', err);
-                    alert('连接错误: ' + err.message);
-                });
-            } catch (err) {
-                console.error("PeerJS初始化错误:", err);
-                alert("PeerJS初始化失败: " + err.message);
-            }
-        }
-        
-        // 设置连接
-        function setupConnection() {
-            connection.on('open', () => {
-                console.log("连接已打开");
-                
-                if (role === 'controller') {
-                    document.getElementById('connectionStatus').innerHTML = '<span>已连接</span>';
-                    document.getElementById('connectionStatus').className = 'status connected';
-                } else {
-                    document.getElementById('displayConnectionStatus').innerHTML = '<span>已连接</span>';
-                    document.getElementById('displayConnectionStatus').className = 'status connected';
-                }
-            });
-            
-            connection.on('data', (data) => {
-                console.log("收到数据:", data);
-                handleIncomingData(data);
-            });
-            
-            connection.on('close', () => {
-                console.log("连接已关闭");
-                
-                if (role === 'controller') {
-                    document.getElementById('connectionStatus').innerHTML = '<span>连接已断开</span>';
-                    document.getElementById('connectionStatus').className = 'status';
-                } else {
-                    document.getElementById('displayConnectionStatus').innerHTML = '<span>连接已断开</span>';
-                    document.getElementById('displayConnectionStatus').className = 'status';
-                }
-                
-                connection = null;
-            });
-        }
-        
-        // 处理收到的数据
-        function handleIncomingData(data) {
-            if (!data || typeof data !== 'object') return;
-            
-            if (role === 'display' && data.type === 'content') {
-                document.getElementById('promptContent').textContent = data.content;
-            }
-        }
-        
-        // 控制端函数
-        function connectToPeer() {
-            const peerId = document.getElementById('peerId').value.trim();
-            if (!peerId) {
-                alert('请输入显示端ID');
+        // 加入会话 - 控制端
+        function joinSession() {
+            const sessionId = document.getElementById('sessionId').value.trim();
+            if (!sessionId) {
+                alert('请输入会话ID');
                 return;
             }
             
-            try {
-                console.log("尝试连接到:", peerId);
-                connection = peer.connect(peerId, { reliable: true });
-                setupConnection();
-            } catch (err) {
-                console.error('连接错误:', err);
-                alert('连接失败: ' + err.message);
-            }
+            // 设置数据库引用
+            sessionRef = database.ref('sessions/' + sessionId);
+            
+            // 设置初始数据
+            sessionRef.set({
+                content: '',
+                fontSize: 32,
+                scrollSpeed: 2,
+                scrolling: false,
+                mirrorMode: false,
+                lastUpdated: firebase.database.ServerValue.TIMESTAMP
+            }).then(() => {
+                console.log('成功创建/加入会话:', sessionId);
+                document.getElementById('connectionStatus').textContent = '已连接到会话: ' + sessionId;
+                document.getElementById('connectionStatus').className = 'status connected';
+                
+                // 监听数据变化
+                sessionRef.on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        // 保持界面上的值与数据库同步
+                        document.getElementById('fontSizeValue').textContent = data.fontSize;
+                        document.getElementById('fontSize').value = data.fontSize;
+                        document.getElementById('scrollSpeedValue').textContent = data.scrollSpeed;
+                        document.getElementById('scrollSpeed').value = data.scrollSpeed;
+                        document.getElementById('mirrorToggle').checked = data.mirrorMode;
+                        
+                        // 根据滚动状态更新按钮
+                        document.getElementById('scrollBtn').textContent = data.scrolling ? '暂停滚动' : '开始滚动';
+                    }
+                });
+            }).catch((error) => {
+                console.error('加入会话失败:', error);
+                alert('加入会话失败: ' + error.message);
+            });
         }
         
+        // 加入会话 - 显示端
+        function joinDisplaySession() {
+            const sessionId = document.getElementById('displaySessionId').value.trim();
+            if (!sessionId) {
+                alert('请输入会话ID');
+                return;
+            }
+            
+            // 设置数据库引用
+            sessionRef = database.ref('sessions/' + sessionId);
+            
+            // 监听数据变化
+            sessionRef.on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    console.log('收到数据更新:', data);
+                    // 更新显示内容
+                    if (data.content !== undefined) {
+                        document.getElementById('promptContent').textContent = data.content;
+                    }
+                    
+                    // 更新字体大小
+                    if (data.fontSize !== undefined) {
+                        document.getElementById('promptContent').style.fontSize = data.fontSize + 'px';
+                    }
+                    
+                    // 处理滚动
+                    if (data.scrolling !== undefined) {
+                        if (data.scrolling) {
+                            startScrolling(data.scrollSpeed);
+                        } else {
+                            stopScrolling();
+                        }
+                    }
+                    
+                    // 处理镜像模式
+                    if (data.mirrorMode !== undefined) {
+                        if (data.mirrorMode) {
+                            document.getElementById('promptContent').classList.add('mirror');
+                        } else {
+                            document.getElementById('promptContent').classList.remove('mirror');
+                        }
+                    }
+                    
+                    // 更新连接状态
+                    document.getElementById('displayStatus').textContent = '已连接到会话: ' + sessionId;
+                    document.getElementById('displayStatus').className = 'status connected';
+                } else {
+                    console.log('没有找到会话数据');
+                    document.getElementById('displayStatus').textContent = '无法加入会话: ' + sessionId;
+                    document.getElementById('displayStatus').className = 'status';
+                }
+            });
+        }
+        
+        // 发送文本
         function sendText() {
-            if (!connection) {
-                alert('请先连接到显示端');
+            if (!sessionRef) {
+                alert('请先创建/加入会话');
                 return;
             }
             
             const text = document.getElementById('promptText').value;
-            console.log("发送文本:", text);
-            connection.send({ type: 'content', content: text });
+            sessionRef.update({
+                content: text,
+                lastUpdated: firebase.database.ServerValue.TIMESTAMP
+            });
         }
         
+        // 清空文本
         function clearText() {
             document.getElementById('promptText').value = '';
-            if (connection) {
-                connection.send({ type: 'content', content: '' });
+            if (sessionRef) {
+                sessionRef.update({
+                    content: '',
+                    lastUpdated: firebase.database.ServerValue.TIMESTAMP
+                });
             }
         }
         
-        // 复制ID函数
-        function copyMyId() {
-            const myId = document.getElementById('myId');
-            myId.select();
-            document.execCommand('copy');
-            alert('ID已复制到剪贴板');
+        // 更新字体大小
+        function updateFontSize(value) {
+            document.getElementById('fontSizeValue').textContent = value;
+            if (sessionRef) {
+                sessionRef.update({
+                    fontSize: parseInt(value),
+                    lastUpdated: firebase.database.ServerValue.TIMESTAMP
+                });
+            }
         }
         
-        function copyDisplayId() {
-            const displayId = document.getElementById('displayId');
-            displayId.select();
-            document.execCommand('copy');
-            alert('ID已复制到剪贴板');
+        // 更新滚动速度
+        function updateScrollSpeed(value) {
+            document.getElementById('scrollSpeedValue').textContent = value;
+            scrollSpeed = parseInt(value);
+            if (sessionRef) {
+                sessionRef.update({
+                    scrollSpeed: scrollSpeed,
+                    lastUpdated: firebase.database.ServerValue.TIMESTAMP
+                });
+                
+                // 如果正在滚动，更新滚动速度
+                if (scrolling) {
+                    stopScrolling();
+                    startScrolling(scrollSpeed);
+                }
+            }
+        }
+        
+        // 切换滚动
+        function toggleScroll() {
+            if (!sessionRef) return;
+            
+            const newScrollingState = !scrolling;
+            scrolling = newScrollingState;
+            
+            sessionRef.update({
+                scrolling: newScrollingState,
+                lastUpdated: firebase.database.ServerValue.TIMESTAMP
+            });
+            
+            document.getElementById('scrollBtn').textContent = newScrollingState ? '暂停滚动' : '开始滚动';
+        }
+        
+        // 重置滚动
+        function resetScroll() {
+            if (sessionRef) {
+                sessionRef.update({
+                    resetScroll: true,
+                    lastUpdated: firebase.database.ServerValue.TIMESTAMP
+                }).then(() => {
+                    // 重置标志
+                    setTimeout(() => {
+                        sessionRef.update({
+                            resetScroll: false
+                        });
+                    }, 500);
+                });
+            }
+        }
+        
+        // 显示端重置滚动
+        function resetDisplayScroll() {
+            const display = document.querySelector('.teleprompter-display');
+            if (display) {
+                display.scrollTop = 0;
+            }
+        }
+        
+        // 切换镜像模式
+        function toggleMirror(checked) {
+            if (sessionRef) {
+                sessionRef.update({
+                    mirrorMode: checked,
+                    lastUpdated: firebase.database.ServerValue.TIMESTAMP
+                });
+            }
+        }
+        
+        // 开始滚动
+        function startScrolling(speed) {
+            if (scrollInterval) {
+                clearInterval(scrollInterval);
+            }
+            
+            scrolling = true;
+            const display = document.querySelector('.teleprompter-display');
+            
+            scrollInterval = setInterval(() => {
+                if (display) {
+                    display.scrollTop += parseInt(speed || scrollSpeed);
+                }
+            }, 50);
+        }
+        
+        // 停止滚动
+        function stopScrolling() {
+            scrolling = false;
+            
+            if (scrollInterval) {
+                clearInterval(scrollInterval);
+                scrollInterval = null;
+            }
         }
     </script>
 </body>
